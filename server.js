@@ -17,7 +17,8 @@ const io = new Server(server, {
   cors: {
     origin: '*',
     methods: ['GET', 'POST', 'PUT']
-  }
+  },
+  allowEIO3: true // Allow older clients (like ESP32 WebSockets library)
 });
 
 app.use(cors());
