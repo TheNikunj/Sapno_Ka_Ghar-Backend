@@ -8,6 +8,11 @@ const Home = require('../models/Home');
 exports.register = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
+    
+    // Enforce basic schema boundaries
+    if (!name || !email || !password) return res.status(400).json({ error: 'All fields are required to register.' });
+    if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+
     let userRole = role === 'Member' ? 'Member' : 'Owner'; 
     if (role === 'Admin') userRole = 'Admin'; 
     
@@ -18,6 +23,10 @@ exports.register = async (req, res) => {
     await newUser.save();
     res.status(201).json({ message: 'User registered successfully. Waiting for verification.' });
   } catch (error) {
+    // 11000 Unique Constraint duplicate check
+    if (error.code === 11000) {
+      return res.status(409).json({ error: 'Email is already associated with an account. Please login.' });
+    }
     res.status(500).json({ error: error.message });
   }
 };
@@ -26,8 +35,10 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Please enter both email and password.' });
+
     const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ error: 'User not found' });
+    if (!user) return res.status(404).json({ error: 'No account found with this email. Please register.' });
     if (user.isBlocked) return res.status(403).json({ error: 'Account Suspended by Admin' });
     if (!user.isVerified && user.role !== 'Member') return res.status(403).json({ error: 'Account not verified yet. Wait for Admin.' }); // Members verify later via Home
 
