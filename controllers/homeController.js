@@ -117,6 +117,29 @@ exports.joinHome = async (req, res) => {
 
     home.members.push({ user: req.user.id, status: 'pending' });
     await home.save();
+    
+    // Notify the owner dynamically in real-time
+    if (req.io) {
+      const requestingUser = await User.findById(req.user.id);
+      const userName = requestingUser ? requestingUser.name : 'Unknown User';
+      const notifMsg = `👤 ${userName} has submitted a request to join the home!`;
+      
+      const notif = await Notification.create({
+        home: home._id,
+        actorName: userName,
+        message: notifMsg
+      });
+      
+      req.io.to(home._id.toString()).emit('notification', { 
+        _id: notif._id.toString(), 
+        id: Date.now(), 
+        actorName: userName, 
+        message: notifMsg, 
+        createdAt: new Date().toISOString() 
+      });
+      req.io.to(home._id.toString()).emit('homeUpdated');
+    }
+
     res.json({ message: 'Join request sent successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });

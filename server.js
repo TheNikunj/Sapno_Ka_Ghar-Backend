@@ -24,6 +24,12 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json());
 
+// Attach socket.io instance to the express request object
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/home', homeRoutes);
