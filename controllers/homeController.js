@@ -1,6 +1,7 @@
 const Home = require('../models/Home');
 const User = require('../models/User');
 const Notification = require('../models/Notification');
+const Message = require('../models/Message');
 
 // Create Home
 exports.createHome = async (req, res) => {
@@ -45,6 +46,7 @@ exports.addRoom = async (req, res) => {
     home.rooms.push({ name, devices: devices || [] });
     await home.save();
 
+    if (req.io) req.io.to(home._id.toString()).emit('homeUpdated');
     res.json({ message: 'Room configuration deployed successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -137,6 +139,7 @@ exports.joinHome = async (req, res) => {
         message: notifMsg, 
         createdAt: new Date().toISOString() 
       });
+      req.io.to(home._id.toString()).emit('newJoinRequest');
       req.io.to(home._id.toString()).emit('homeUpdated');
     }
 
@@ -166,6 +169,7 @@ exports.approveMember = async (req, res) => {
       await userToVerify.save();
     }
 
+    if (req.io) req.io.to(home._id.toString()).emit('homeUpdated');
     res.json({ message: 'Member approved successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -187,6 +191,7 @@ exports.rejectMember = async (req, res) => {
     member.role = 'member'; // Strip admin if blocked
     await home.save();
 
+    if (req.io) req.io.to(home._id.toString()).emit('homeUpdated');
     res.json({ message: 'Member request rejected/blocked' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -207,6 +212,7 @@ exports.promoteMember = async (req, res) => {
     member.role = 'admin';
     await home.save();
 
+    if (req.io) req.io.to(home._id.toString()).emit('homeUpdated');
     res.json({ message: 'Member logically promoted to House Admin' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -226,6 +232,7 @@ exports.demoteMember = async (req, res) => {
     member.role = 'member';
     await home.save();
 
+    if (req.io) req.io.to(home._id.toString()).emit('homeUpdated');
     res.json({ message: 'Admin downgraded back to Member' });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -279,6 +286,51 @@ exports.clearNotifications = async (req, res) => {
 
     await Notification.deleteMany({ home: home._id });
     res.json({ message: 'Notifications cleared successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Get real-time Chat messages
+exports.getHomeChat = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const homeId = req.params.homeId;
+    
+    // Security check: is the user part of this home?
+    let home = await Home.findOne({ _id: homeId, owner: userId });
+    if (!home) {
+      home = await Home.findOne({ _id: homeId, 'members.user': userId, 'members.status': 'approved' });
+    }
+    
+    if (!home) return res.status(403).json({ error: 'Not authorized or home not found' });
+
+    const messages = await Message.find({ home: homeId }).sort({ createdAt: 1 }).limit(100);
+    res.json(messages);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Clear Chat Messages
+exports.clearHomeChat = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const homeId = req.params.homeId;
+    
+    // Only the owner can clear the chat
+    const home = await Home.findOne({ _id: homeId, owner: userId });
+    
+    if (!home) return res.status(403).json({ error: 'Only the Home Creator can clear the chat' });
+
+    await Message.deleteMany({ home: homeId });
+    
+    // Notify clients globally via socket
+    if (req.io) {
+      req.io.to(homeId).emit('chatCleared');
+    }
+    
+    res.json({ message: 'Chat history securely erased' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -25,6 +25,10 @@ router.post('/room', auth, homeController.addRoom);
 router.get('/notifications', auth, homeController.getRecentNotifications);
 router.delete('/notifications/clear', auth, homeController.clearNotifications);
 
+// Chat route
+router.get('/:homeId/chat', auth, homeController.getHomeChat);
+router.delete('/:homeId/chat', auth, homeController.clearHomeChat);
+
 // Admin / Owner Controls
 router.put('/approve/:memberId', auth, homeController.approveMember);
 router.delete('/reject/:memberId', auth, homeController.rejectMember);

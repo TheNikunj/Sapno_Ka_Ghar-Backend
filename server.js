@@ -60,19 +60,18 @@ io.on('connection', (socket) => {
         if (room) {
           const device = room.devices.id(deviceId);
           if (device) {
-            device.isOn = state;
-            await home.save();
-            
-            // Broadcast the physical shift to everyone looking at this home
-            io.to(homeId).emit('deviceUpdate', { roomId, deviceId, state });
-
             // Generate precise Action String for DB
             const stateString = state ? 'ON' : 'OFF';
             const notifMsg = `🔔 ${userName} turned ${stateString} the ${device.name}`;
             
-            // Step A: Immediately send transient popup to active clients
+            // Fast Path: Immediately send transient popup to active clients
+            io.to(homeId).emit('deviceUpdate', { roomId, deviceId, state });
             io.to(homeId).emit('notification', { _id: Date.now().toString(), id: Date.now(), actorName: userName, stateStr: stateString, deviceName: device.name, message: notifMsg, createdAt: new Date().toISOString() });
 
+            // Apply DB Mutation and pause system for sync
+            device.isOn = state;
+            await home.save();
+            
             // Step B: Save it permanently to the 24-hour log database
             await Notification.create({
               home: homeId,
@@ -84,6 +83,25 @@ io.on('connection', (socket) => {
       }
     } catch (err) {
       console.log('Error toggling device:', err.message);
+    }
+  });
+
+  // Handle chat messages
+  socket.on('sendChatMessage', async (data) => {
+    const { homeId, senderId, senderName, text } = data;
+    try {
+      const Message = require('./models/Message');
+      const newMessage = await Message.create({
+        home: homeId,
+        senderId,
+        senderName,
+        text
+      });
+
+      // Broadcast to everyone in the home
+      io.to(homeId).emit('receiveChatMessage', newMessage);
+    } catch (error) {
+      console.log('Error sending chat message:', error.message);
     }
   });
 
