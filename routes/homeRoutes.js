@@ -34,6 +34,7 @@ router.put('/approve/:memberId', auth, homeController.approveMember);
 router.delete('/reject/:memberId', auth, homeController.rejectMember);
 router.put('/promote/:memberId', auth, homeController.promoteMember);
 router.put('/demote/:memberId', auth, homeController.demoteMember);
+router.put('/member/:memberId/rooms', auth, homeController.updateMemberRooms);
 router.get('/pending', auth, homeController.getPendingMembers);
 
 module.exports = router;

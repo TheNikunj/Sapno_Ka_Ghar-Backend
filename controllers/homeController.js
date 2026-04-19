@@ -80,6 +80,12 @@ exports.getHome = async (req, res) => {
           if(me.status !== 'approved') {
             return res.status(403).json({ error: 'Waiting for Owner Approval' });
           }
+          
+          if (me.role === 'member' && me.roomAccessConfigured) {
+            home = home.toObject(); 
+            const allowedRoomsSet = new Set((me.accessibleRooms || []).map(id => id.toString()));
+            home.rooms = home.rooms.filter(r => allowedRoomsSet.has(r._id.toString()));
+          }
         }
       }
     }
@@ -331,6 +337,30 @@ exports.clearHomeChat = async (req, res) => {
     }
     
     res.json({ message: 'Chat history securely erased' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Update Member Room Restrictions
+exports.updateMemberRooms = async (req, res) => {
+  try {
+    const { memberId } = req.params;
+    const { roomIds } = req.body;
+
+    const home = await Home.findOne({ owner: req.user.id });
+    if (!home) return res.status(403).json({ error: 'Only the Home Creator can update room access' });
+
+    const member = home.members.find(m => m.user && m.user.toString() === memberId);
+    if (!member) return res.status(404).json({ error: 'Member not found' });
+
+    member.accessibleRooms = roomIds || [];
+    member.roomAccessConfigured = true;
+    
+    await home.save();
+
+    if (req.io) req.io.to(home._id.toString()).emit('homeUpdated');
+    res.json({ message: 'Room permissions updated successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

@@ -20,7 +20,9 @@ const homeSchema = new mongoose.Schema({
   members: [{
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     status: { type: String, enum: ['pending', 'approved', 'blocked'], default: 'pending' },
-    role: { type: String, enum: ['member', 'admin'], default: 'member' }
+    role: { type: String, enum: ['member', 'admin'], default: 'member' },
+    accessibleRooms: [{ type: String }],
+    roomAccessConfigured: { type: Boolean, default: false }
   }]
 });
 
