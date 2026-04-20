@@ -86,6 +86,13 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Handle live temperature updates from Arduino
+  socket.on('temperatureUpdate', (data) => {
+    const { homeId, temperature } = data;
+    // Broadcast the temperature to everyone connected to this home
+    io.to(homeId).emit('temperatureUpdate', { temperature });
+  });
+
   // Handle chat messages
   socket.on('sendChatMessage', async (data) => {
     const { homeId, senderId, senderName, text } = data;
